@@ -1,0 +1,18 @@
+{
+  "name": "web-bank-duverger-enond",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "parcel build --public-url / -d ./target/classes/public ./src/main/resources/public/index.html",
+    "start-dev": "parcel --public-url / -d ./target/classes/public ./src/main/resources/public/index.html"
+  },
+  "author": "Duverger Pierre, Enond Justine",
+  "license": "ISC",
+  "dependencies": {
+    "parcel-bundler": "^1.12.5",
+    "react": "17.0.2",
+    "react-dom": "^17.0.2"
+  }
+}
