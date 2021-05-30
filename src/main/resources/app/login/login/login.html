@@ -1,0 +1,31 @@
+<header>
+    <span class="title"><b>Livre d'or</b></span>
+</header>
+
+<main>
+
+    <div class="login-container">
+        <div ui-view="error"></div>
+        <div>
+            <h2>Page de connexion</h2>
+        </div>
+        <form ng-submit="login.login()" >
+            <div class="login-input-div">
+
+                <label for="username">Email</label>
+                <input id="username" name="username" ng-model="login.id" type="email"/>
+                <label for="password">Mot de passe</label>
+                <input id="password"
+                       autocomplete="false"
+                       name="password" type="password"
+                       ng-model="login.password"/>
+            </div>
+            <div class="login-action-div">
+                <button type="submit">Se connecter
+                </button>
+            </div>
+        </form>
+
+
+    </div>
+</main>

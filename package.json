@@ -5,14 +5,26 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "parcel build --public-url / -d ./target/classes/public ./src/main/resources/public/index.html",
-    "start-dev": "parcel --public-url / -d ./target/classes/public ./src/main/resources/public/index.html"
+    "build": "parcel build --public-url / -d ./target/classes/public ./src/main/resources/public/index.html ./src/main/resources/public/login.html ./src/main/resources/public/banque.html",
+    "start-dev": "parcel --public-url / -d ./target/classes/public ./src/main/resources/public/index.html ./src/main/resources/public/login.html ./src/main/resources/public/banque.html"
   },
   "author": "Duverger Pierre, Enond Justine",
   "license": "ISC",
   "dependencies": {
-    "parcel-bundler": "^1.12.5",
-    "react": "17.0.2",
-    "react-dom": "^17.0.2"
+    "@babel/plugin-syntax-async-generators": "^7.2.0",
+    "@fortawesome/fontawesome-free": "^5.8.1",
+    "@uirouter/angularjs": "^1.0.29",
+    "angular": "1.6.5",
+    "angular-cookies": "^1.7.7",
+    "jquery": "^3.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.0.0-0",
+    "@babel/plugin-transform-runtime": "^7.4.3",
+    "@babel/preset-env": "^7.4.3",
+    "@types/angular-ui-router": "1.1.40",
+    "autoprefixer": "^9.5.0",
+    "parcel-bundler": "^1.12.3",
+    "typescript": "^4.2.4"
   }
 }

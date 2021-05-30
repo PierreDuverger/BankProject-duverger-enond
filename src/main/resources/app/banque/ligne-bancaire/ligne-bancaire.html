@@ -1,0 +1,40 @@
+
+<header >
+  <span ng-if="ctrl.userService.user"
+        class="fas fa-user-alt fa-2x"
+        title="Connecté en tant que {{ctrl.userService.user.email}}"
+  > {{ctrl.userService.user.name}}</span>
+    <span class="title"><b>Vos lignes bancaires</b></span>
+    <span ng-if="ctrl.userService.user"
+          title="Se déconnecter"
+          class="fas fa-sign-out-alt fa-2x"
+          ng-click="ctrl.userService.deconnecter();"></span>
+</header>
+
+<main class="App-intro">
+    <div class="comments-container">
+
+        <div ng-repeat="lignebancaire in ctrl.lignesbancaire track by $index" class="comment" >
+            <div ng-if="ctrl.userService.user.admin"
+                 ng-click="ctrl.deleteLigneBancaire(lignebancaire)"><span class="fa fa-times"></span></div>
+            <div class="comment-text" ng-bind-html="ctrl.$sce.trustAsHtml(lignebancaire.text)"></div>
+            <div class="comment-writer" ng-click="ctrl.showUser(lignebancaire.user)">Ecris par {{lignebancaire.user.name}}</div>
+        </div>
+    </div>
+
+    <div ui-view="user">
+
+    </div>
+</main>
+<footer class="new-comment">
+
+    <div>
+          <textarea
+                  placeholder="Ajouter une ligne bancaire"
+                  ng-model="ctrl.newLigneBancaireText"
+                  rows="6">
+
+          </textarea>
+        <button ng-click="ctrl.valider()"><span class="fas fa-check fa-3x"></span></button>
+    </div>
+</footer>
