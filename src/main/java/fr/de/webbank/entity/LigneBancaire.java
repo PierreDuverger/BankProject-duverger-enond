@@ -1,10 +1,13 @@
 package fr.de.webbank.entity;
 
 
+import lombok.AllArgsConstructor;
+
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import java.math.BigDecimal;
 
+@AllArgsConstructor
 @Entity
 public class LigneBancaire {
 
