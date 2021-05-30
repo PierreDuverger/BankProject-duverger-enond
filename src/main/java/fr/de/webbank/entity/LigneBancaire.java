@@ -2,54 +2,29 @@ package fr.de.webbank.entity;
 
 
 import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.OneToOne;
 import java.math.BigDecimal;
 
+@Data
+@NoArgsConstructor
 @AllArgsConstructor
 @Entity
 public class LigneBancaire {
 
     @Id
+    @GeneratedValue
     private Integer id;
 
-    private String user;
-
     private BigDecimal montant;
-
     private String libelle;
 
+    @OneToOne
+    private User user;
 
-    public Integer getId() {
-        return id;
-    }
-
-    public void setId(Integer id) {
-        this.id = id;
-    }
-
-    public String getUser() {
-        return user;
-    }
-
-    public void setUser(String user) {
-        this.user = user;
-    }
-
-    public BigDecimal getMontant() {
-        return montant;
-    }
-
-    public void setMontant(BigDecimal montant) {
-        this.montant = montant;
-    }
-
-    public String getLibelle() {
-        return libelle;
-    }
-
-    public void setLibelle(String libelle) {
-        this.libelle = libelle;
-    }
 }

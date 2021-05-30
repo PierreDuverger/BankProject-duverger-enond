@@ -43,7 +43,7 @@ public class User implements UserDetails {
     @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if(admin){
-            return Arrays.asList(new SimpleGrantedAuthority("WRITE_ACCESS"));
+            return Arrays.asList(new SimpleGrantedAuthority("ROLE_ADMIN"));
         }
         return null ;
     }

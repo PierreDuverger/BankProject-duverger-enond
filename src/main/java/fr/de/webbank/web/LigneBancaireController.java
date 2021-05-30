@@ -7,6 +7,7 @@ import fr.de.webbank.entity.User;
 import fr.de.webbank.repository.LigneBancaireRepository;
 import fr.de.webbank.repository.UserRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.Cookie;
@@ -16,64 +17,36 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/lignebancaire")
+@RequestMapping("/api/ligne-bancaire")
 public class LigneBancaireController {
 
     private LigneBancaireRepository ligneBancaireRepository;
-    private UserRepository userRepository;
 
-    public LigneBancaireController(LigneBancaireRepository repo, UserRepository userRepository) {
+    public LigneBancaireController(LigneBancaireRepository repo) {
         this.ligneBancaireRepository = repo;
-        this.userRepository = userRepository;
     }
 
     @GetMapping
-    Collection<LigneBancaire> ligneBancaires() {
-        return ligneBancaireRepository.findAll();
+    Collection<LigneBancaire> users() {
+        List<LigneBancaire> all = ligneBancaireRepository.findAll();
+        all.forEach(ligne->{
+            ligne.getUser().setPassword(null);
+        });
+        return all;
     }
-
     @PostMapping
     void save(@RequestBody LigneBancaire ligneBancaire) {
-        ligneBancaireRepository.save(ligneBancaire);
+        User principal = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        ligneBancaire.setUser(principal);
+        ligneBancaireRepository.save(ligneBancaire);;
     }
 
     @DeleteMapping
-    void delete(@RequestParam Integer id, HttpServletRequest request, HttpServletResponse res) {
-        if (request.getCookies() != null) {
-            Optional<Cookie> cookie = Arrays.stream(request.getCookies())
-                    .filter(c -> "USER".equals(c.getName()))
-                    .findAny();
-            cookie.ifPresent((c) -> {
-                ObjectMapper mapper = new ObjectMapper();
-                User user = null;
-                try {
-                    user = mapper.readValue(URLDecoder.decode(c.getValue()), User.class);
-                } catch (IOException e) {
-
-                    try {
-                        res.sendError(HttpStatus.UNAUTHORIZED.value());
-                    } catch (IOException ex) {
-                    }
-                }
-                Optional<User> byId = userRepository.findById(user.getId());
-                byId.ifPresent(u -> {
-                    if (u.isAdmin()) {
-                        ligneBancaireRepository.delete(new LigneBancaire(id,null, null, null));
-                        return;
-                    }
-
-                    try {
-                        res.sendError(HttpStatus.UNAUTHORIZED.value());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                });
-
-            });
-        }
+    void delete(@RequestParam Integer id) {
+        ligneBancaireRepository.delete(new LigneBancaire(id,null, null, null));
     }
 }

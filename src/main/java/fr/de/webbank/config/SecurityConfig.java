@@ -1,39 +1,39 @@
 package fr.de.webbank.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.org.apache.xml.internal.security.algorithms.SignatureAlgorithm;
 import fr.de.webbank.entity.AuthToken;
-import fr.de.webbank.entity.User;
-import fr.de.webbank.repository.UserRepository;
+import fr.de.webbank.repository.AuthTokenRepository;
 import fr.de.webbank.service.UserService;
-import org.eclipse.microprofile.jwt.Claims;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.Http403ForbiddenEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.util.WebUtils;
 
-import java.util.Date;
-import java.util.Objects;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Optional;
 
 @Configuration
 @EnableWebSecurity
@@ -41,10 +41,20 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter implements WebM
 
 
     @Autowired
-    UserRepository userRepository;
+    UserService userDetailsService;
 
     @Autowired
-    private JwtConfig jwtConfig;
+    AuthTokenRepository authTokenRepository;
+
+    @Value("${fr.de.webbank.auth.token}")
+    private String authToken;
+
+
+    @Value("${fr.de.webbank.csrf.token}")
+    private String csrfCookieTokenName;
+
+    @Value("${fr.de.webbank.csrf.header.token}")
+    private String csrfHeaderTokenName;
 
 
     @Bean
@@ -52,101 +62,98 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter implements WebM
         return new BCryptPasswordEncoder();
     }
 
+    @Override
     @Bean
-    public AuthenticationProvider getAuthProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider() {
-            @Override
-            public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+    public AuthenticationManager authenticationManager() {
+        return authentication -> {
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) authentication;
 
-                UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) authentication;
-
-                String name = auth.getName();
-                String password = auth.getCredentials().toString();
+            String name = auth.getName();
+            String password = auth.getCredentials()
+                    .toString();
 
 
-                UserDetails user = this.getUserDetailsService().loadUserByUsername(name);
+            UserDetails user = userDetailsService.loadUserByUsername(name);
 
-                if (user == null || !bCryptPasswordEncoder().matches(password, user.getPassword())) {
-                    throw new BadCredentialsException("Username/Password does not match for " + auth.getPrincipal());
-                }
-
-                return new UsernamePasswordAuthenticationToken(user, password, user.getAuthorities());
-
+            if (user == null || !bCryptPasswordEncoder().matches(password, user.getPassword())) {
+                throw new BadCredentialsException("Username/Password does not match for " + auth.getPrincipal());
             }
+
+            return new UsernamePasswordAuthenticationToken(user, password, user.getAuthorities());
+
         };
-        provider.setUserDetailsService(userDetailsService());
-        return provider;
     }
 
-    @Bean
-    AuthenticationSuccessHandler getAuthSuccessHandler() {
-        AuthenticationSuccessHandler handler = (httpServletRequest, httpServletResponse, authentication) -> {
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            final User user = (User) authentication.getPrincipal();
-            Claims claims = Jwts.claims().setSubject(user.getUsername());
+    private CookieCsrfTokenRepository getCsrfTokenRepository() {
+        CookieCsrfTokenRepository cookieCsrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        cookieCsrfTokenRepository.setCookieName(csrfCookieTokenName);
+        return cookieCsrfTokenRepository;
+    }
 
-            String token = Jwts.builder()
-                    .setClaims(claims)
-                    .setIssuedAt(new Date(System.currentTimeMillis()))
-                    .setExpiration(new Date(System.currentTimeMillis() + jwtConfig.getExpiration()))
-                    .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecret())
-                    .compact();
-            ObjectMapper mapper = new ObjectMapper();
-            String responseToken = mapper.writeValueAsString(new AuthToken(token));
+    private LogoutSuccessHandler getLogoutSuccessHandler() {
+        return new LogoutSuccessHandler() {
+            private final Logger log = LoggerFactory.getLogger(this.getClass());
 
-            httpServletResponse.getWriter().append(responseToken);
+            @Override
+            public void onLogoutSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
+                Cookie token = WebUtils.getCookie(request, authToken);
+                if (token != null) {
+                    Optional<AuthToken> byUserId = authTokenRepository.findById(token.getValue());
+
+                    byUserId.ifPresent((authToken) -> {
+                        authTokenRepository.delete(authToken);
+                        log.info("suppression de la session : {}", authToken.getToken());
+                    });
+                }
+            }
         };
-        return handler;
     }
 
     @Override
-    @Bean
-    protected UserDetailsService userDetailsService() {
-        return username -> {
-            Objects.requireNonNull(username);
-            User user = userRepository.findByEmail(username)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
-            return user;
-        };
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        auth.userDetailsService(userDetailsService);
     }
 
-    @Bean
-    public JwtConfig jwtConfig() {
-        return new JwtConfig();
+    @Override
+    public void configure(final WebSecurity web) throws Exception {
+        web.ignoring().mvcMatchers("/img/**", "/*.js", "/*.css", "/*.html");
     }
 
     @Override
     protected void configure(final HttpSecurity http) throws Exception {
         http
-                .csrf().disable()
-                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                .and()
                 .exceptionHandling()
                 .authenticationEntryPoint(new Http403ForbiddenEntryPoint())
                 .and()
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+
+        http
                 .authorizeRequests()
-                .antMatchers("/login", "/*.js", "/*.html", "/*.css", "/*.woff2", "/*.woff", "/*.ttf").permitAll()
-                .antMatchers("/").permitAll()
-                .antMatchers("/banque").permitAll()
+                .antMatchers("/api/user/login", "/", "/login", "/banque", "/error", "/css/*").permitAll()
                 .antMatchers(HttpMethod.DELETE, "/api/ligne-bancaire").hasAuthority("ROLE_ADMIN")
-                .anyRequest().authenticated()
-                .and().addFilterBefore(new JwtTokenAuthenticationFilter(jwtConfig, userDetailsService()), UsernamePasswordAuthenticationFilter.class)
-                .authenticationProvider(getAuthProvider())
-                .formLogin()
-                .loginPage("/login")
-                .loginProcessingUrl("/login")
-                .defaultSuccessUrl("/banque")
-                .failureUrl("/#!/login/error")
-                .and()
-                .httpBasic()
-                .and()
+                .anyRequest().authenticated();
+
+        http
+                .addFilterBefore(new AuthenticationFilter(authTokenRepository, userDetailsService, authToken), UsernamePasswordAuthenticationFilter.class);
+
+        http
                 .logout()
                 .logoutUrl("/api/user/logout")
-                .logoutSuccessUrl("/")
+                .logoutSuccessHandler(getLogoutSuccessHandler())
+                .logoutSuccessUrl("/login")
                 .invalidateHttpSession(true)
-                .deleteCookies("JSESSIONID");
+                .deleteCookies(authToken, csrfCookieTokenName);
+
+        http
+                .csrf()
+                .requireCsrfProtectionMatcher(request ->
+                        ("/api/user/login".equals(request.getRequestURI())
+                                || ("/api/ligne-bancaire".equals(request.getRequestURI()) && HttpMethod.POST.matches(request.getMethod())
+                        ))
+                )
+                .csrfTokenRepository(getCsrfTokenRepository())
         ;
+
 
     }
 
